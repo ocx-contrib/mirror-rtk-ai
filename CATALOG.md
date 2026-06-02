@@ -1,0 +1,24 @@
+---
+title: RTK
+description: CLI proxy that filters and summarizes command output to cut LLM token usage 60-90%
+keywords: rtk,cli,llm,tokens,proxy,rust,ai
+---
+
+# RTK
+
+RTK (Rust Token Killer) is a high-performance CLI proxy that filters and
+summarizes the output of common developer commands before it reaches an LLM
+context, cutting token consumption by 60-90%. It is a single dependency-free
+Rust binary that wraps `git`, `gh`, `docker`, `kubectl`, `cargo`, `npm`, and
+dozens of other tools with token-optimized output.
+
+## What's included
+
+- **rtk** — the CLI proxy. Run `rtk <command>` (e.g. `rtk git status`,
+  `rtk json file.json`, `rtk ls`) to get compact, LLM-friendly output, and
+  `rtk gain` to see the token savings.
+
+## Links
+
+- [RTK website](https://www.rtk-ai.app)
+- [RTK on GitHub](https://github.com/rtk-ai/rtk)
