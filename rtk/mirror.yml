@@ -1,0 +1,109 @@
+extends: ../mirror-base.yml
+
+name: rtk
+
+# Logical index package `rtk-ai/rtk` at the physical path
+# `ghcr.io/ocx-contrib/rtk-ai/rtk` — slash segments, never hyphen-flattened.
+# The first segment must be this repo's own GitHub owner: GITHUB_TOKEN only
+# authorises packages owned by the repo the workflow runs in.
+#
+# The namespace is upstream's org `rtk-ai`, not the tool name: rtk-ai owns
+# several repositories, so it is a real family rather than one person's
+# handle — the case that gives `yq/yq` its tool-as-namespace shape.
+#
+# Succeeds the flat `ocx.sh/rtk` coordinate this repository published before
+# the grouped layout.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/rtk-ai/rtk
+
+source:
+  type: github_release
+  owner: rtk-ai
+  repo: rtk
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# Upstream cross-compiles rtk with Rust and ships exactly TWO Linux assets,
+# one per arch, and they measure DIFFERENTLY. On v0.44.2:
+#
+#   $ file rtk            # from rtk-x86_64-unknown-linux-musl.tar.gz
+#   ELF 64-bit LSB pie executable, x86-64, static-pie linked, stripped
+#   $ readelf -l … | grep INTERP  → (none)
+#   $ readelf -d … | grep NEEDED  → (none)
+#
+#   $ file rtk            # from rtk-aarch64-unknown-linux-gnu.tar.gz
+#   ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked,
+#   interpreter /lib/ld-linux-aarch64.so.1, for GNU/Linux 3.7.0, stripped
+#   $ readelf -d … | grep NEEDED  → libgcc_s.so.1, libm.so.6, libc.so.6,
+#                                   ld-linux-aarch64.so.1
+#
+# amd64 requires nothing of the host → BARE key. Tagging it `+libc.musl`
+# would be a false requirement that hid the most common install target from
+# every glibc host. arm64 requires a glibc loader and libgcc_s →
+# `+libc.glibc`. The suffix must appear on BOTH this `assets:` key and the
+# matching `platforms:` key in ../mirror-base.yml, which also carries the
+# container legs that turn each claim into evidence.
+#
+# There is no arm64 musl and no amd64 gnu build upstream, so neither key has a
+# counterpart to split against.
+#
+# ─── Scope (verified against all 13 in-range releases, v0.38.0 … v0.44.2)
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   rtk_*.deb, rtk*.rpm     — distro installers, not a portable bundle
+#   checksums.txt           — sidecar
+#
+# The anchored ^…$ regexes are what keep those out. Resolution verified BOTH
+# ways across EVERY in-range release: each of the five patterns matches
+# EXACTLY one asset, every time. A pattern matching zero is silently skipped,
+# not an error — it would yield a green run with a missing platform.
+assets:
+  linux/amd64:
+    - "^rtk-x86_64-unknown-linux-musl\\.tar\\.gz$"
+  "linux/arm64+libc.glibc":
+    - "^rtk-aarch64-unknown-linux-gnu\\.tar\\.gz$"
+  darwin/amd64:
+    - "^rtk-x86_64-apple-darwin\\.tar\\.gz$"
+  darwin/arm64:
+    - "^rtk-aarch64-apple-darwin\\.tar\\.gz$"
+  windows/amd64:
+    - "^rtk-x86_64-pc-windows-msvc\\.zip$"
+
+asset_type:
+  # Every archive holds a single flat executable at its root — `rtk` in the
+  # tarballs, `rtk.exe` in the Windows zip — with no wrapper directory, so
+  # nothing may be stripped. The executable IS the content root; that is what
+  # forces `bin_scan: off` in ../mirror-base.yml.
+  type: archive
+  strip_components: 0
+
+metadata:
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  min: "0.38.0"
+  new_per_run: 5
+  poll_interval: "0 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default`
+  # and `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: rtk/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/rtk-ai/rtk/license --jq '.license.spdx_id'
+  #   Apache-2.0
+  org.opencontainers.image.licenses: "Apache-2.0"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: rtk-ai/rtk
+  fork: ocx-contrib/index
